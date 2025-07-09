@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Expense Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>💸 My Expense Tracker 💸</h1>
+    </header>
+
+    <main>
+        <section class="transaction-form-section">
+            <h2>새로운 내역 추가하기</h2>
+            <form id="transaction-form">
+                <div class="form-group">
+                    <label for="type">종류:</label>
+                    <select id="type" required>
+                        <option value="expense">지출</option>
+                        <option value="income">수입</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="amount">금액:</label>
+                    <input type="number" id="amount" placeholder="금액을 입력하세요" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="category">카테고리:</label>
+                    <select id="category" required>
+                        <option value="식비">식비</option>
+                        <option value="교통비">교통비</option>
+                        <option value="문화생활">문화생활</option>
+                        <option value="월급">월급</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">내용:</label>
+                    <input type="text" id="description" placeholder="무엇에 썼나요?">
+                </div>
+
+                <div class="form-group">
+                    <label for="date">날짜:</label>
+                    <input type="date" id="date" required>
+                </div>
+
+                <button type="submit">내역 추가</button>
+            </form>
+        </section>
+
+        <section class="transaction-list-section">
+            <h2>내역 목록</h2>
+            <div id="transaction-list">
+                <p>아직 내역이 없어요. 새로운 내역을 추가해보세요!</p>
+            </div>
+        </section>
+
+        <section class="summary-section">
+            <h2>월별 요약</h2>
+            <div id="monthly-summary">
+                <p>내역을 추가하면 요약을 볼 수 있어요.</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
