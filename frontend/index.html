@@ -13,8 +13,9 @@
 
     <main>
         <section class="transaction-form-section">
-            <h2>새로운 내역 추가하기</h2>
             <form id="transaction-form">
+                <h2 id="form-title">새로운 내역 추가하기</h2>
+                <input type="hidden" id="transaction-id">
                 <div class="form-group">
                     <label for="type">종류:</label>
                     <select id="type" required>
@@ -49,7 +50,7 @@
                     <input type="date" id="date" required>
                 </div>
 
-                <button type="submit">내역 추가</button>
+                <button type="submit" id="submit-button">내역 추가</button>
             </form>
         </section>
 
