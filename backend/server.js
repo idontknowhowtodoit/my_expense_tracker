@@ -121,6 +121,48 @@ app.delete('/api/transactions/:id', (req, res) => {
     });
 });
 
+// [GET] 월별 요약 조회 API
+// 경로: /api/summary/:year/:month
+// 특정 연월의 총수입, 총지출, 순수익을 계산하여 반환합니다.
+app.get('/api/summary/:year/:month', (req, res) => {
+    const { year, month } = req.params;
+
+    // 월을 두 자리 숫자로 포맷팅 (예: 1월 -> '01', 10월 -> '10')
+    const paddedMonth = month.padStart(2, '0');
+    // 해당 월의 시작일과 마지막일 패턴을 만듭니다.
+    const datePattern = `${year}-${paddedMonth}-%`; // 예: '2025-07-%'
+
+    const sql = `
+        SELECT
+            SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS totalIncome,
+            SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS totalExpense
+        FROM transactions
+        WHERE date LIKE ?;
+    `;
+
+    db.get(sql, [datePattern], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        const totalIncome = row.totalIncome || 0;
+        const totalExpense = row.totalExpense || 0;
+        const netProfit = totalIncome - totalExpense;
+
+        res.json({
+            message: 'success',
+            data: {
+                year: parseInt(year),
+                month: parseInt(month),
+                totalIncome: totalIncome,
+                totalExpense: totalExpense,
+                netProfit: netProfit
+            }
+        });
+    });
+});
+
 // --- 서버 시작 ---
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);

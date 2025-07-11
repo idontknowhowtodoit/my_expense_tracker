@@ -16,6 +16,7 @@
             <form id="transaction-form">
                 <h2 id="form-title">새로운 내역 추가하기</h2>
                 <input type="hidden" id="transaction-id">
+                
                 <div class="form-group">
                     <label for="type">종류:</label>
                     <select id="type" required>
@@ -63,8 +64,11 @@
 
         <section class="summary-section">
             <h2>월별 요약</h2>
+            <div class="summary-controls">
+                <select id="summary-month-select"></select>
+            </div>
             <div id="monthly-summary">
-                <p>내역을 추가하면 요약을 볼 수 있어요.</p>
+                <p>월을 선택하면 요약을 볼 수 있어요.</p>
             </div>
         </section>
     </main>
