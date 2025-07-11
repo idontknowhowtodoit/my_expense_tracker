@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const transactionListDiv = document.getElementById('transaction-list');
     const summaryMonthSelect = document.getElementById('summary-month-select');
     const monthlySummaryDiv = document.getElementById('monthly-summary');
+    const expenseChartCanvas = document.getElementById('expenseChart'); // 새로 추가된 캔버스 요소
+    let expenseChartInstance = null; // 차트 인스턴스를 저장할 변수
 
     // 현재 날짜를 기본값으로 설정
     document.getElementById('date').valueAsDate = new Date();
@@ -12,7 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 월 선택 드롭다운 채우기 및 이벤트 리스너 설정
     populateMonthSelect();
-    summaryMonthSelect.addEventListener('change', displayMonthlySummary);
+    summaryMonthSelect.addEventListener('change', () => {
+        displayMonthlySummary();
+        renderExpenseChart(); // 월 변경 시 차트도 새로 그림
+    });
 
     // 폼 제출 이벤트 리스너 (새 내역 추가 또는 기존 내역 수정)
     transactionForm.addEventListener('submit', async (event) => {
@@ -67,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadTransactions(); // 내역 목록 새로고침
             displayMonthlySummary(); // 월별 요약도 새로고침
             populateMonthSelect(); // 월 선택 드롭다운도 새로고침 (새로운 연월 내역이 추가되었을 수 있으므로)
+            renderExpenseChart(); // 차트도 새로 그림
 
             transactionForm.reset(); // 폼 초기화
             document.getElementById('date').valueAsDate = new Date(); // 날짜 필드 초기화
@@ -184,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadTransactions(); // 내역 목록 새로고침
             displayMonthlySummary(); // 월별 요약도 새로고침
             populateMonthSelect(); // 월 선택 드롭다운도 새로고침
+            renderExpenseChart(); // 차트도 새로 그림
 
             alert('내역이 성공적으로 삭제되었습니다!');
         } catch (error) {
@@ -196,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 월 선택 드롭다운에 옵션 채우기
     async function populateMonthSelect() {
-        // 모든 내역을 가져와서 존재하는 모든 연월을 파악합니다.
         try {
             const response = await fetch('http://localhost:3000/api/transactions');
             if (!response.ok) {
@@ -205,40 +211,38 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             const transactions = data.data;
 
-            const months = new Set(); // 중복을 피하기 위해 Set 사용
+            const months = new Set();
 
             transactions.forEach(transaction => {
                 const date = new Date(transaction.date);
                 const year = date.getFullYear();
-                const month = date.getMonth() + 1; // getMonth()는 0부터 시작하므로 +1
-                months.add(`${year}-${month}`); // 'YYYY-M' 형식으로 저장
+                const month = date.getMonth() + 1;
+                months.add(`${year}-${month}`);
             });
 
-            // Set을 배열로 변환하고 최신 월부터 정렬
             const sortedMonths = Array.from(months).sort((a, b) => {
                 const [aYear, aMonth] = a.split('-').map(Number);
                 const [bYear, bMonth] = b.split('-').map(Number);
-                if (bYear !== aYear) return bYear - aYear; // 연도 내림차순
-                return bMonth - aMonth; // 월 내림차순
+                if (bYear !== aYear) return bYear - aYear;
+                return bMonth - aMonth;
             });
 
-            summaryMonthSelect.innerHTML = '<option value="">월 선택</option>'; // 기본 옵션
+            summaryMonthSelect.innerHTML = '<option value="">월 선택</option>';
             if (sortedMonths.length > 0) {
                 sortedMonths.forEach(monthStr => {
                     const [year, month] = monthStr.split('-');
                     const option = document.createElement('option');
-                    option.value = monthStr; // 'YYYY-M'
+                    option.value = monthStr;
                     option.textContent = `${year}년 ${month}월`;
                     summaryMonthSelect.appendChild(option);
                 });
-                // 드롭다운에 첫 번째 (가장 최신) 월을 자동으로 선택하도록 함
                 summaryMonthSelect.value = sortedMonths[0];
             } else {
                 summaryMonthSelect.innerHTML = '<option value="">내역 없음</option>';
             }
 
-            // 드롭다운 채운 후 바로 요약 정보 표시 (가장 최신 월)
-            displayMonthlySummary();
+            displayMonthlySummary(); // 드롭다운 채운 후 바로 요약 정보 표시
+            renderExpenseChart(); // 드롭다운 채운 후 바로 차트 그리기
 
         } catch (error) {
             console.error('월 선택 드롭다운 채우기 오류:', error);
@@ -254,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const [year, month] = selectedMonth.split('-'); // 'YYYY-M' -> [YYYY, M]
+        const [year, month] = selectedMonth.split('-');
 
         try {
             const response = await fetch(`http://localhost:3000/api/summary/${year}/${month}`);
@@ -273,6 +277,102 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('월별 요약 표시 오류:', error);
             monthlySummaryDiv.innerHTML = '<p>월별 요약을 불러오는 데 실패했습니다.</p>';
+        }
+    }
+
+    // --- 차트 기능 관련 함수 ---
+
+    // 월별 지출 카테고리 파이 차트 그리기
+    async function renderExpenseChart() {
+        const selectedMonth = summaryMonthSelect.value;
+        if (!selectedMonth) {
+            // 차트가 표시될 캔버스 영역을 비워두거나 메시지를 표시
+            if (expenseChartInstance) {
+                expenseChartInstance.destroy();
+                expenseChartInstance = null;
+            }
+            const chartContainer = expenseChartCanvas.parentElement;
+            chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">월을 선택하면 지출 분석 차트를 볼 수 있어요.</p>';
+            return;
+        }
+
+        try {
+            const response = await fetch('http://localhost:3000/api/transactions');
+            if (!response.ok) {
+                throw new Error('내역을 불러오는 중 오류가 발생했습니다.');
+            }
+            const data = await response.json();
+            const transactions = data.data;
+
+            const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+
+            // 선택된 월의 지출 내역만 필터링하고 카테고리별로 금액 집계
+            const categoryExpenses = {};
+            transactions.forEach(t => {
+                const transactionDate = new Date(t.date);
+                if (t.type === 'expense' &&
+                    transactionDate.getFullYear() === selectedYear &&
+                    (transactionDate.getMonth() + 1) === selectedMonthNum) {
+                    categoryExpenses[t.category] = (categoryExpenses[t.category] || 0) + t.amount;
+                }
+            });
+
+            const labels = Object.keys(categoryExpenses);
+            const dataValues = Object.values(categoryExpenses);
+
+            // 데이터가 없으면 차트 대신 메시지 표시
+            if (labels.length === 0) {
+                if (expenseChartInstance) {
+                    expenseChartInstance.destroy();
+                    expenseChartInstance = null;
+                }
+                const chartContainer = expenseChartCanvas.parentElement;
+                chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">선택된 월에 지출 내역이 없습니다.</p>';
+                return;
+            }
+
+            // 차트 색상 정의 (더 다양한 색상 추가 가능)
+            const backgroundColors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+                '#E7E9ED', '#8AC926', '#F4A261', '#2A9D8F', '#E9C46A', '#F4F1DE'
+            ];
+            const borderColors = backgroundColors.map(color => color.replace(')', ', 1)')); // 불투명하게
+
+            // 기존 차트 인스턴스가 있으면 파괴하고 새로 생성
+            if (expenseChartInstance) {
+                expenseChartInstance.destroy();
+            }
+
+            // Chart.js를 사용하여 파이 차트 생성
+            const ctx = expenseChartCanvas.getContext('2d');
+            expenseChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: backgroundColors.slice(0, labels.length), // 데이터 개수에 맞게 색상 사용
+                        borderColor: borderColors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: `${selectedYear}년 ${selectedMonthNum}월 지출 카테고리`
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('지출 차트 렌더링 오류:', error);
+            const chartContainer = expenseChartCanvas.parentElement;
+            chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">차트를 불러오는 데 실패했습니다.</p>';
         }
     }
 });

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Expense Tracker</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header>
@@ -69,6 +70,13 @@
             </div>
             <div id="monthly-summary">
                 <p>월을 선택하면 요약을 볼 수 있어요.</p>
+            </div>
+        </section>
+
+        <section class="chart-section">
+            <h2>월별 지출 카테고리 분석</h2>
+            <div class="chart-container">
+                <canvas id="expenseChart"></canvas>
             </div>
         </section>
     </main>
