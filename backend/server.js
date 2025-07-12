@@ -1,32 +1,31 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
-const cors = require('cors');
+const cors = require('cors'); // CORS 미들웨어 추가
 
 const app = express();
-const port = 3000; // 서버 포트
+const port = 3000;
 
-// 미들웨어 설정
-app.use(cors()); // CORS 허용 (개발 시 모든 도메인 허용)
-app.use(express.json()); // JSON 형식 요청 본문 파싱
+// CORS 설정: 모든 출처에서의 요청을 허용
+app.use(cors());
+app.use(express.json()); // JSON 요청 본문 파싱
 
 // SQLite 데이터베이스 연결
-// 데이터베이스 파일이 없으면 자동으로 생성돼요.
 const db = new sqlite3.Database('./mywallet.db', (err) => {
     if (err) {
-        console.error('데이터베이스 연결 오류:', err.message);
+        console.error('SQLite 데이터베이스 연결 오류:', err.message);
     } else {
         console.log('SQLite 데이터베이스에 연결되었습니다.');
         // 트랜잭션 테이블 생성 (없을 경우)
         db.run(`CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type TEXT NOT NULL,       -- 'expense' 또는 'income'
-            amount REAL NOT NULL,     -- 금액 (실수형)
-            category TEXT NOT NULL,   -- 카테고리 (식비, 교통비 등)
-            description TEXT,         -- 내용 (선택 사항)
-            date TEXT NOT NULL        -- 날짜 (YYYY-MM-DD 형식)
-        )`, (err) => {
-            if (err) {
-                console.error('테이블 생성 오류:', err.message);
+            type TEXT NOT NULL, -- 'income' 또는 'expense'
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT,
+            date TEXT NOT NULL -- YYYY-MM-DD 형식
+        )`, (createErr) => {
+            if (createErr) {
+                console.error('transactions 테이블 생성 오류:', createErr.message);
             } else {
                 console.log('transactions 테이블이 준비되었습니다.');
             }
@@ -34,31 +33,33 @@ const db = new sqlite3.Database('./mywallet.db', (err) => {
     }
 });
 
-// --- API 엔드포인트 ---
+// API 엔드포인트
 
-// [GET] 모든 내역 조회 API
-// 경로: /api/transactions
+// 1. 모든 내역 가져오기 (GET)
 app.get('/api/transactions', (req, res) => {
-    const sql = 'SELECT * FROM transactions ORDER BY date DESC, id DESC'; 
-    db.all(sql, [], (err, rows) => {
+    db.all("SELECT * FROM transactions", [], (err, rows) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-        res.json({
-            message: 'success',
-            data: rows
-        });
+        res.json({ message: "success", data: rows });
     });
 });
 
-// [POST] 새로운 내역 추가 API
-// 경로: /api/transactions
+// 2. 새 내역 추가 (POST)
 app.post('/api/transactions', (req, res) => {
     const { type, amount, category, description, date } = req.body;
 
+    // 서버 측 유효성 검사
     if (!type || !amount || !category || !date) {
-        return res.status(400).json({ error: '필수 필드를 모두 입력해주세요: type, amount, category, date' });
+        return res.status(400).json({ error: "필수 필드(type, amount, category, date)가 누락되었습니다." });
+    }
+    if (typeof amount !== 'number' || amount <= 0) {
+        return res.status(400).json({ error: "금액은 0보다 큰 숫자여야 합니다." });
+    }
+    // 날짜 형식 검사 (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ error: "날짜 형식이 올바르지 않습니다 (YYYY-MM-DD)." });
     }
 
     const sql = `INSERT INTO transactions (type, amount, category, description, date) VALUES (?, ?, ?, ?, ?)`;
@@ -67,22 +68,24 @@ app.post('/api/transactions', (req, res) => {
             res.status(500).json({ error: err.message });
             return;
         }
-        res.status(201).json({
-            message: '내역이 성공적으로 추가되었습니다.',
-            id: this.lastID,
-            type, amount, category, description, date
-        });
+        res.status(201).json({ message: "success", id: this.lastID });
     });
 });
 
-// [PUT] 내역 수정 API
-// 경로: /api/transactions/:id
+// 3. 내역 수정 (PUT)
 app.put('/api/transactions/:id', (req, res) => {
     const { id } = req.params;
     const { type, amount, category, description, date } = req.body;
 
+    // 서버 측 유효성 검사
     if (!type || !amount || !category || !date) {
-        return res.status(400).json({ error: '필수 필드를 모두 입력해주세요: type, amount, category, date' });
+        return res.status(400).json({ error: "필수 필드(type, amount, category, date)가 누락되었습니다." });
+    }
+    if (typeof amount !== 'number' || amount <= 0) {
+        return res.status(400).json({ error: "금액은 0보다 큰 숫자여야 합니다." });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ error: "날짜 형식이 올바르지 않습니다 (YYYY-MM-DD)." });
     }
 
     const sql = `UPDATE transactions SET type = ?, amount = ?, category = ?, description = ?, date = ? WHERE id = ?`;
@@ -92,66 +95,56 @@ app.put('/api/transactions/:id', (req, res) => {
             return;
         }
         if (this.changes === 0) {
-            res.status(404).json({ message: '해당 ID의 내역을 찾을 수 없거나 변경 사항이 없습니다.' });
+            res.status(404).json({ message: "해당 ID의 내역을 찾을 수 없습니다." });
         } else {
-            res.json({
-                message: `내역 (ID: ${id})이 성공적으로 수정되었습니다.`,
-                id, type, amount, category, description, date
-            });
+            res.json({ message: "success", changes: this.changes });
         }
     });
 });
 
-// [DELETE] 내역 삭제 API
-// 경로: /api/transactions/:id
+// 4. 내역 삭제 (DELETE)
 app.delete('/api/transactions/:id', (req, res) => {
     const { id } = req.params;
-
-    const sql = `DELETE FROM transactions WHERE id = ?`;
-    db.run(sql, id, function(err) {
+    db.run("DELETE FROM transactions WHERE id = ?", id, function(err) {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
         if (this.changes === 0) {
-            res.status(404).json({ message: '해당 ID의 내역을 찾을 수 없습니다.' });
+            res.status(404).json({ message: "해당 ID의 내역을 찾을 수 없습니다." });
         } else {
-            res.json({ message: `내역 (ID: ${id})이 성공적으로 삭제되었습니다.` });
+            res.json({ message: "success", changes: this.changes });
         }
     });
 });
 
-// [GET] 월별 요약 조회 API
-// 경로: /api/summary/:year/:month
-// 특정 연월의 총수입, 총지출, 순수익을 계산하여 반환합니다.
+// 5. 월별 요약 가져오기 (GET)
 app.get('/api/summary/:year/:month', (req, res) => {
     const { year, month } = req.params;
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = `${year}-${String(month).padStart(2, '0')}-31`; // 월말일은 정확하지 않을 수 있으나, LIKE 쿼리가 더 정확
 
-    // 월을 두 자리 숫자로 포맷팅 (예: 1월 -> '01', 10월 -> '10')
-    const paddedMonth = month.padStart(2, '0');
-    // 해당 월의 시작일과 마지막일 패턴을 만듭니다.
-    const datePattern = `${year}-${paddedMonth}-%`; // 예: '2025-07-%'
-
+    // SQLite의 strftime 함수를 사용하여 YYYY-MM 형식으로 필터링
     const sql = `
         SELECT
             SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS totalIncome,
             SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS totalExpense
         FROM transactions
-        WHERE date LIKE ?;
+        WHERE STRFTIME('%Y-%m', date) = ?;
     `;
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
 
-    db.get(sql, [datePattern], (err, row) => {
+    db.get(sql, [monthKey], (err, row) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
         }
-
         const totalIncome = row.totalIncome || 0;
         const totalExpense = row.totalExpense || 0;
         const netProfit = totalIncome - totalExpense;
 
         res.json({
-            message: 'success',
+            message: "success",
             data: {
                 year: parseInt(year),
                 month: parseInt(month),
@@ -163,7 +156,40 @@ app.get('/api/summary/:year/:month', (req, res) => {
     });
 });
 
-// --- 서버 시작 ---
+// 6. 월별 수입/지출 추이 데이터 가져오기 (새로운 API)
+app.get('/api/monthly-trends', (req, res) => {
+    const sql = `
+        SELECT
+            STRFTIME('%Y-%m', date) AS month,
+            SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS totalIncome,
+            SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS totalExpense
+        FROM transactions
+        GROUP BY month
+        ORDER BY month ASC;
+    `;
+
+    db.all(sql, [], (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        res.json({ message: "success", data: rows });
+    });
+});
+
+
+// 서버 시작
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);
+});
+
+// 애플리케이션 종료 시 데이터베이스 연결 닫기 (선택 사항)
+process.on('SIGINT', () => {
+    db.close((err) => {
+        if (err) {
+            console.error('데이터베이스 연결 종료 오류:', err.message);
+        }
+        console.log('SQLite 데이터베이스 연결이 종료되었습니다.');
+        process.exit(0);
+    });
 });

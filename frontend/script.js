@@ -4,7 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryMonthSelect = document.getElementById('summary-month-select');
     const monthlySummaryDiv = document.getElementById('monthly-summary');
     const expenseChartCanvas = document.getElementById('expenseChart');
+    const incomeExpenseTrendChartCanvas = document.getElementById('incomeExpenseTrendChart'); // 새 차트 캔버스
+    
     let expenseChartInstance = null;
+    let incomeExpenseTrendChartInstance = null; // 새 차트 인스턴스
 
     // 필터링 및 정렬 UI 요소들
     const filterTypeSelect = document.getElementById('filter-type');
@@ -128,7 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
             applyFiltersAndSort(); // 필터링 및 정렬 적용하여 목록 표시
             populateMonthSelect(); // 월 선택 드롭다운 새로고침
             displayMonthlySummary(); // 월별 요약 새로고침
-            renderExpenseChart(); // 차트 새로고침
+            renderExpenseChart(); // 카테고리 차트 새로고침
+            renderIncomeExpenseTrendChart(); // 수입/지출 추이 차트 새로고침 (새로 추가)
 
         } catch (error) {
             console.error('내역 불러오기 오류:', error);
@@ -425,5 +429,94 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+    }
+
+    // 5일차: 월별 수입/지출 추이 차트 그리기 (새로 추가)
+    async function renderIncomeExpenseTrendChart() {
+        try {
+            const response = await fetch('http://localhost:3000/api/monthly-trends');
+            if (!response.ok) {
+                throw new Error('월별 추이 데이터를 불러오는 중 오류가 발생했습니다.');
+            }
+            const data = await response.json();
+            const trends = data.data;
+
+            if (trends.length === 0) {
+                if (incomeExpenseTrendChartInstance) {
+                    incomeExpenseTrendChartInstance.destroy();
+                    incomeExpenseTrendChartInstance = null;
+                }
+                const chartContainer = incomeExpenseTrendChartCanvas.parentElement;
+                chartContainer.innerHTML = '<canvas id="incomeExpenseTrendChart"></canvas><p style="text-align: center; margin-top: 10px;">수입/지출 추이 데이터를 표시할 내역이 없습니다.</p>';
+                return;
+            }
+
+            // 월별 데이터 정렬 및 포맷팅
+            const labels = trends.map(t => t.month); // 예: "2023-01"
+            const incomes = trends.map(t => t.totalIncome);
+            const expenses = trends.map(t => t.totalExpense);
+
+            if (incomeExpenseTrendChartInstance) {
+                incomeExpenseTrendChartInstance.destroy();
+            }
+
+            const ctx = incomeExpenseTrendChartCanvas.getContext('2d');
+            incomeExpenseTrendChartInstance = new Chart(ctx, {
+                type: 'line', // 라인 차트
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '총 수입',
+                            data: incomes,
+                            borderColor: '#27ae60', // 수입: 녹색 계열
+                            backgroundColor: 'rgba(39, 174, 96, 0.2)',
+                            fill: true,
+                            tension: 0.3 // 곡선 부드럽게
+                        },
+                        {
+                            label: '총 지출',
+                            data: expenses,
+                            borderColor: '#e74c3c', // 지출: 빨간색 계열
+                            backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                            fill: true,
+                            tension: 0.3 // 곡선 부드럽게
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: '월별 수입/지출 추이'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '월'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '금액 (원)'
+                            },
+                            beginAtZero: true // Y축 0부터 시작
+                        }
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error('월별 수입/지출 추이 차트 렌더링 오류:', error);
+            const chartContainer = incomeExpenseTrendChartCanvas.parentElement;
+            chartContainer.innerHTML = '<canvas id="incomeExpenseTrendChart"></canvas><p style="text-align: center; margin-top: 10px;">수입/지출 추이 차트를 불러오는 데 실패했습니다.</p>';
+        }
     }
 });

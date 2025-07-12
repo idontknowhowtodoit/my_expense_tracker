@@ -229,4 +229,8 @@ button:hover {
     .filter-sort-controls button {
         align-self: stretch; /* 버튼도 전체 너비 사용 */
     }
+    /* 차트 컨테이너도 반응형으로 너비 조절 */
+    .chart-container {
+        width: 100%;
+    }
 }
