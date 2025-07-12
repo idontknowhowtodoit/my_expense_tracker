@@ -57,7 +57,48 @@
         </section>
 
         <section class="transaction-list-section">
-            <h2>내역 목록</h2>
+            <h2 id="transaction-list-title">내역 목록</h2> 
+            
+            <div class="filter-sort-controls">
+                <div class="control-group">
+                    <label for="filter-type">종류:</label>
+                    <select id="filter-type">
+                        <option value="all">전체</option>
+                        <option value="expense">지출</option>
+                        <option value="income">수입</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="filter-category">카테고리:</label>
+                    <select id="filter-category">
+                        <option value="all">전체</option>
+                        <option value="식비">식비</option>
+                        <option value="교통비">교통비</option>
+                        <option value="문화생활">문화생활</option>
+                        <option value="월급">월급</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="sort-by">정렬:</label>
+                    <select id="sort-by">
+                        <option value="date-desc">날짜 (최신순)</option>
+                        <option value="date-asc">날짜 (오래된순)</option>
+                        <option value="amount-desc">금액 (높은순)</option>
+                        <option value="amount-asc">금액 (낮은순)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="start-date">시작일:</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="control-group">
+                    <label for="end-date">종료일:</label>
+                    <input type="date" id="end-date">
+                </div>
+                <button id="reset-filters-btn">필터 초기화</button>
+            </div>
+
             <div id="transaction-list">
                 <p>아직 내역이 없어요. 새로운 내역을 추가해보세요!</p>
             </div>

@@ -3,21 +3,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const transactionListDiv = document.getElementById('transaction-list');
     const summaryMonthSelect = document.getElementById('summary-month-select');
     const monthlySummaryDiv = document.getElementById('monthly-summary');
-    const expenseChartCanvas = document.getElementById('expenseChart'); // 새로 추가된 캔버스 요소
-    let expenseChartInstance = null; // 차트 인스턴스를 저장할 변수
+    const expenseChartCanvas = document.getElementById('expenseChart');
+    let expenseChartInstance = null;
+
+    // 필터링 및 정렬 UI 요소들
+    const filterTypeSelect = document.getElementById('filter-type');
+    const filterCategorySelect = document.getElementById('filter-category');
+    const sortBySelect = document.getElementById('sort-by');
+    const startDateInput = document.getElementById('start-date');
+    const endDateInput = document.getElementById('end-date');
+    const resetFiltersBtn = document.getElementById('reset-filters-btn');
+
+    let allTransactions = []; // 모든 원본 내역을 저장할 배열
 
     // 현재 날짜를 기본값으로 설정
     document.getElementById('date').valueAsDate = new Date();
 
-    // 페이지 로드 시 기존 내역 불러오기
-    loadTransactions();
+    // 페이지 로드 시 모든 내역 불러오기
+    fetchAllTransactions();
 
     // 월 선택 드롭다운 채우기 및 이벤트 리스너 설정
     populateMonthSelect();
     summaryMonthSelect.addEventListener('change', () => {
         displayMonthlySummary();
-        renderExpenseChart(); // 월 변경 시 차트도 새로 그림
+        renderExpenseChart();
     });
+
+    // 필터링 및 정렬 UI 요소 변경 시 이벤트 리스너
+    filterTypeSelect.addEventListener('change', applyFiltersAndSort);
+    filterCategorySelect.addEventListener('change', applyFiltersAndSort);
+    sortBySelect.addEventListener('change', applyFiltersAndSort);
+    startDateInput.addEventListener('change', applyFiltersAndSort);
+    endDateInput.addEventListener('change', applyFiltersAndSort);
+    resetFiltersBtn.addEventListener('click', resetFilters);
+
 
     // 폼 제출 이벤트 리스너 (새 내역 추가 또는 기존 내역 수정)
     transactionForm.addEventListener('submit', async (event) => {
@@ -29,6 +48,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const category = document.getElementById('category').value;
         const description = document.getElementById('description').value;
         const date = document.getElementById('date').value;
+
+        // 클라이언트 측 유효성 검사 (추가)
+        if (parseFloat(amount) <= 0) {
+            alert('금액은 0보다 커야 합니다.');
+            return;
+        }
+        if (new Date(date) > new Date()) {
+            alert('미래 날짜는 선택할 수 없습니다.');
+            return;
+        }
 
         const transactionData = {
             type,
@@ -69,11 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             console.log('작업 성공:', result);
 
-            loadTransactions(); // 내역 목록 새로고침
-            displayMonthlySummary(); // 월별 요약도 새로고침
-            populateMonthSelect(); // 월 선택 드롭다운도 새로고침 (새로운 연월 내역이 추가되었을 수 있으므로)
-            renderExpenseChart(); // 차트도 새로 그림
-
+            fetchAllTransactions(); // 모든 내역을 다시 불러와서 업데이트 (필터링/정렬/요약/차트 모두 반영)
             transactionForm.reset(); // 폼 초기화
             document.getElementById('date').valueAsDate = new Date(); // 날짜 필드 초기화
             document.getElementById('transaction-id').value = ''; // 숨겨진 ID 필드 초기화
@@ -87,24 +112,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 모든 내역을 백엔드에서 불러와 화면에 표시하는 함수
-    async function loadTransactions() {
+    // --- 주요 내역 관리 함수 ---
+
+    // 모든 내역을 백엔드에서 불러와 allTransactions 배열에 저장하는 함수
+    async function fetchAllTransactions() {
         try {
             const response = await fetch('http://localhost:3000/api/transactions');
             if (!response.ok) {
                 throw new Error('내역을 불러오는 중 오류가 발생했습니다.');
             }
             const data = await response.json();
+            allTransactions = data.data; // 불러온 모든 내역을 저장
 
-            transactionListDiv.innerHTML = ''; // 기존 목록 비우기
-
-            if (data.data && data.data.length > 0) {
-                data.data.forEach(transaction => {
-                    addTransactionToDisplay(transaction);
-                });
-            } else {
-                transactionListDiv.innerHTML = '<p>아직 내역이 없어요. 새로운 내역을 추가해보세요!</p>';
-            }
+            // 데이터가 변경되었으므로 모든 관련 UI 업데이트
+            applyFiltersAndSort(); // 필터링 및 정렬 적용하여 목록 표시
+            populateMonthSelect(); // 월 선택 드롭다운 새로고침
+            displayMonthlySummary(); // 월별 요약 새로고침
+            renderExpenseChart(); // 차트 새로고침
 
         } catch (error) {
             console.error('내역 불러오기 오류:', error);
@@ -112,45 +136,106 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 화면에 하나의 내역을 추가하는 보조 함수
-    function addTransactionToDisplay(transaction) {
-        const transactionItem = document.createElement('div');
-        transactionItem.className = 'transaction-item';
+    // 필터링 및 정렬을 적용하여 내역을 표시하는 함수
+    function applyFiltersAndSort() {
+        let filteredTransactions = [...allTransactions]; // 원본 데이터를 복사하여 사용
 
-        const displayDate = new Date(transaction.date + 'T00:00:00');
-        const formattedDate = displayDate.toLocaleDateString('ko-KR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
+        const filterType = filterTypeSelect.value;
+        const filterCategory = filterCategorySelect.value;
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+        const sortBy = sortBySelect.value;
+
+        // 1. 필터링 적용
+        if (filterType !== 'all') {
+            filteredTransactions = filteredTransactions.filter(t => t.type === filterType);
+        }
+
+        if (filterCategory !== 'all') {
+            filteredTransactions = filteredTransactions.filter(t => t.category === filterCategory);
+        }
+
+        if (startDate) {
+            filteredTransactions = filteredTransactions.filter(t => t.date >= startDate);
+        }
+        if (endDate) {
+            filteredTransactions = filteredTransactions.filter(t => t.date <= endDate);
+        }
+
+        // 2. 정렬 적용
+        filteredTransactions.sort((a, b) => {
+            if (sortBy === 'date-desc') {
+                return new Date(b.date) - new Date(a.date);
+            } else if (sortBy === 'date-asc') {
+                return new Date(a.date) - new Date(b.date);
+            } else if (sortBy === 'amount-desc') {
+                return b.amount - a.amount;
+            } else if (sortBy === 'amount-asc') {
+                return a.amount - b.amount;
+            }
+            return 0; // 기본 정렬 (변경 없음)
         });
 
-        transactionItem.innerHTML = `
-            <p>
-                <strong>${transaction.type === 'expense' ? '💸 지출' : '💰 수입'}</strong>:
-                <span style="color: ${transaction.type === 'expense' ? '#e74c3c' : '#27ae60'}; font-weight: bold;">
-                    ${transaction.amount.toLocaleString()}원
-                </span>
-            </p>
-            <p>카테고리: ${transaction.category}</p>
-            <p>내용: ${transaction.description || '없음'}</p>
-            <p>날짜: ${formattedDate}</p>
-            <div class="actions">
-                <button class="edit-btn" data-id="${transaction.id}">수정</button>
-                <button class="delete-btn" data-id="${transaction.id}">삭제</button>
-            </div>
-            <hr>
-        `;
-        transactionListDiv.prepend(transactionItem);
+        displayTransactions(filteredTransactions); // 필터링 및 정렬된 내역 표시
+    }
 
-        // 수정 버튼 이벤트 리스너
-        transactionItem.querySelector('.edit-btn').addEventListener('click', () => {
-            editTransaction(transaction);
-        });
+    // 필터 초기화 함수
+    function resetFilters() {
+        filterTypeSelect.value = 'all';
+        filterCategorySelect.value = 'all';
+        sortBySelect.value = 'date-desc';
+        startDateInput.value = '';
+        endDateInput.value = '';
+        applyFiltersAndSort(); // 필터 초기화 후 다시 적용
+    }
 
-        // 삭제 버튼 이벤트 리스너
-        transactionItem.querySelector('.delete-btn').addEventListener('click', () => {
-            deleteTransaction(transaction.id);
-        });
+    // 내역 목록을 화면에 표시하는 함수 (loadTransactions에서 분리)
+    function displayTransactions(transactionsToDisplay) {
+        transactionListDiv.innerHTML = ''; // 기존 목록 비우기
+
+        if (transactionsToDisplay && transactionsToDisplay.length > 0) {
+            transactionsToDisplay.forEach(transaction => {
+                const transactionItem = document.createElement('div');
+                transactionItem.className = 'transaction-item';
+
+                const displayDate = new Date(transaction.date + 'T00:00:00');
+                const formattedDate = displayDate.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+
+                transactionItem.innerHTML = `
+                    <p>
+                        <strong>${transaction.type === 'expense' ? '💸 지출' : '💰 수입'}</strong>:
+                        <span style="color: ${transaction.type === 'expense' ? '#e74c3c' : '#27ae60'}; font-weight: bold;">
+                            ${transaction.amount.toLocaleString()}원
+                        </span>
+                    </p>
+                    <p>카테고리: ${transaction.category}</p>
+                    <p>내용: ${transaction.description || '없음'}</p>
+                    <p>날짜: ${formattedDate}</p>
+                    <div class="actions">
+                        <button class="edit-btn" data-id="${transaction.id}">수정</button>
+                        <button class="delete-btn" data-id="${transaction.id}">삭제</button>
+                    </div>
+                    <hr>
+                `;
+                transactionListDiv.appendChild(transactionItem); // appendChild로 변경 (정렬된 순서 유지)
+
+                // 수정 버튼 이벤트 리스너
+                transactionItem.querySelector('.edit-btn').addEventListener('click', () => {
+                    editTransaction(transaction);
+                });
+
+                // 삭제 버튼 이벤트 리스너
+                transactionItem.querySelector('.delete-btn').addEventListener('click', () => {
+                    deleteTransaction(transaction.id);
+                });
+            });
+        } else {
+            transactionListDiv.innerHTML = '<p>해당 조건에 맞는 내역이 없어요. 새로운 내역을 추가하거나 필터를 초기화해보세요!</p>';
+        }
     }
 
     // 내역 수정 모드로 전환하는 함수
@@ -187,10 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             console.log('내역 삭제 성공:', result);
 
-            loadTransactions(); // 내역 목록 새로고침
-            displayMonthlySummary(); // 월별 요약도 새로고침
-            populateMonthSelect(); // 월 선택 드롭다운도 새로고침
-            renderExpenseChart(); // 차트도 새로 그림
+            fetchAllTransactions(); // 삭제 후 모든 내역 다시 불러오기
 
             alert('내역이 성공적으로 삭제되었습니다!');
         } catch (error) {
@@ -203,51 +285,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 월 선택 드롭다운에 옵션 채우기
     async function populateMonthSelect() {
-        try {
-            const response = await fetch('http://localhost:3000/api/transactions');
-            if (!response.ok) {
-                throw new Error('내역을 불러오는 중 오류가 발생했습니다.');
-            }
-            const data = await response.json();
-            const transactions = data.data;
+        const months = new Set();
+        allTransactions.forEach(transaction => {
+            const date = new Date(transaction.date);
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            months.add(`${year}-${month}`);
+        });
 
-            const months = new Set();
+        const sortedMonths = Array.from(months).sort((a, b) => {
+            const [aYear, aMonth] = a.split('-').map(Number);
+            const [bYear, bMonth] = b.split('-').map(Number);
+            if (bYear !== aYear) return bYear - aYear;
+            return bMonth - aMonth;
+        });
 
-            transactions.forEach(transaction => {
-                const date = new Date(transaction.date);
-                const year = date.getFullYear();
-                const month = date.getMonth() + 1;
-                months.add(`${year}-${month}`);
+        summaryMonthSelect.innerHTML = '<option value="">월 선택</option>';
+        if (sortedMonths.length > 0) {
+            sortedMonths.forEach(monthStr => {
+                const [year, month] = monthStr.split('-');
+                const option = document.createElement('option');
+                option.value = monthStr;
+                option.textContent = `${year}년 ${month}월`;
+                summaryMonthSelect.appendChild(option);
             });
-
-            const sortedMonths = Array.from(months).sort((a, b) => {
-                const [aYear, aMonth] = a.split('-').map(Number);
-                const [bYear, bMonth] = b.split('-').map(Number);
-                if (bYear !== aYear) return bYear - aYear;
-                return bMonth - aMonth;
-            });
-
-            summaryMonthSelect.innerHTML = '<option value="">월 선택</option>';
-            if (sortedMonths.length > 0) {
-                sortedMonths.forEach(monthStr => {
-                    const [year, month] = monthStr.split('-');
-                    const option = document.createElement('option');
-                    option.value = monthStr;
-                    option.textContent = `${year}년 ${month}월`;
-                    summaryMonthSelect.appendChild(option);
-                });
-                summaryMonthSelect.value = sortedMonths[0];
-            } else {
-                summaryMonthSelect.innerHTML = '<option value="">내역 없음</option>';
-            }
-
-            displayMonthlySummary(); // 드롭다운 채운 후 바로 요약 정보 표시
-            renderExpenseChart(); // 드롭다운 채운 후 바로 차트 그리기
-
-        } catch (error) {
-            console.error('월 선택 드롭다운 채우기 오류:', error);
-            summaryMonthSelect.innerHTML = '<p>월 선택 드롭다운을 불러오는 데 실패했습니다.</p>';
+            summaryMonthSelect.value = sortedMonths[0]; // 가장 최신 월 자동 선택
+        } else {
+            summaryMonthSelect.innerHTML = '<option value="">내역 없음</option>';
         }
+
+        // 드롭다운 채운 후 바로 요약 정보와 차트 표시 (가장 최신 월)
+        displayMonthlySummary();
+        renderExpenseChart();
     }
 
     // 선택된 월의 요약 정보를 가져와 화면에 표시
@@ -286,7 +355,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renderExpenseChart() {
         const selectedMonth = summaryMonthSelect.value;
         if (!selectedMonth) {
-            // 차트가 표시될 캔버스 영역을 비워두거나 메시지를 표시
             if (expenseChartInstance) {
                 expenseChartInstance.destroy();
                 expenseChartInstance = null;
@@ -296,83 +364,66 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        try {
-            const response = await fetch('http://localhost:3000/api/transactions');
-            if (!response.ok) {
-                throw new Error('내역을 불러오는 중 오류가 발생했습니다.');
+        const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+
+        // 선택된 월의 지출 내역만 필터링하고 카테고리별로 금액 집계
+        const categoryExpenses = {};
+        allTransactions.forEach(t => { // allTransactions 사용
+            const transactionDate = new Date(t.date);
+            if (t.type === 'expense' &&
+                transactionDate.getFullYear() === selectedYear &&
+                (transactionDate.getMonth() + 1) === selectedMonthNum) {
+                categoryExpenses[t.category] = (categoryExpenses[t.category] || 0) + t.amount;
             }
-            const data = await response.json();
-            const transactions = data.data;
+        });
 
-            const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+        const labels = Object.keys(categoryExpenses);
+        const dataValues = Object.values(categoryExpenses);
 
-            // 선택된 월의 지출 내역만 필터링하고 카테고리별로 금액 집계
-            const categoryExpenses = {};
-            transactions.forEach(t => {
-                const transactionDate = new Date(t.date);
-                if (t.type === 'expense' &&
-                    transactionDate.getFullYear() === selectedYear &&
-                    (transactionDate.getMonth() + 1) === selectedMonthNum) {
-                    categoryExpenses[t.category] = (categoryExpenses[t.category] || 0) + t.amount;
-                }
-            });
-
-            const labels = Object.keys(categoryExpenses);
-            const dataValues = Object.values(categoryExpenses);
-
-            // 데이터가 없으면 차트 대신 메시지 표시
-            if (labels.length === 0) {
-                if (expenseChartInstance) {
-                    expenseChartInstance.destroy();
-                    expenseChartInstance = null;
-                }
-                const chartContainer = expenseChartCanvas.parentElement;
-                chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">선택된 월에 지출 내역이 없습니다.</p>';
-                return;
-            }
-
-            // 차트 색상 정의 (더 다양한 색상 추가 가능)
-            const backgroundColors = [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
-                '#E7E9ED', '#8AC926', '#F4A261', '#2A9D8F', '#E9C46A', '#F4F1DE'
-            ];
-            const borderColors = backgroundColors.map(color => color.replace(')', ', 1)')); // 불투명하게
-
-            // 기존 차트 인스턴스가 있으면 파괴하고 새로 생성
+        if (labels.length === 0) {
             if (expenseChartInstance) {
                 expenseChartInstance.destroy();
+                expenseChartInstance = null;
             }
+            const chartContainer = expenseChartCanvas.parentElement;
+            chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">선택된 월에 지출 내역이 없습니다.</p>';
+            return;
+        }
 
-            // Chart.js를 사용하여 파이 차트 생성
-            const ctx = expenseChartCanvas.getContext('2d');
-            expenseChartInstance = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: dataValues,
-                        backgroundColor: backgroundColors.slice(0, labels.length), // 데이터 개수에 맞게 색상 사용
-                        borderColor: borderColors.slice(0, labels.length),
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        title: {
-                            display: true,
-                            text: `${selectedYear}년 ${selectedMonthNum}월 지출 카테고리`
-                        }
+        const backgroundColors = [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+            '#E7E9ED', '#8AC926', '#F4A261', '#2A9D8F', '#E9C46A', '#F4F1DE'
+        ];
+        const borderColors = backgroundColors.map(color => color.replace(')', ', 1)'));
+
+        if (expenseChartInstance) {
+            expenseChartInstance.destroy();
+        }
+
+        const ctx = expenseChartCanvas.getContext('2d');
+        expenseChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: dataValues,
+                    backgroundColor: backgroundColors.slice(0, labels.length),
+                    borderColor: borderColors.slice(0, labels.length),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: `${selectedYear}년 ${selectedMonthNum}월 지출 카테고리`
                     }
                 }
-            });
-        } catch (error) {
-            console.error('지출 차트 렌더링 오류:', error);
-            const chartContainer = expenseChartCanvas.parentElement;
-            chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">차트를 불러오는 데 실패했습니다.</p>';
-        }
+            }
+        });
     }
 });
