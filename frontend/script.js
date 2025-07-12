@@ -4,10 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryMonthSelect = document.getElementById('summary-month-select');
     const monthlySummaryDiv = document.getElementById('monthly-summary');
     const expenseChartCanvas = document.getElementById('expenseChart');
-    const incomeExpenseTrendChartCanvas = document.getElementById('incomeExpenseTrendChart'); // 새 차트 캔버스
+    const incomeExpenseTrendChartCanvas = document.getElementById('incomeExpenseTrendChart');
     
     let expenseChartInstance = null;
-    let incomeExpenseTrendChartInstance = null; // 새 차트 인스턴스
+    let incomeExpenseTrendChartInstance = null;
 
     // 필터링 및 정렬 UI 요소들
     const filterTypeSelect = document.getElementById('filter-type');
@@ -47,24 +47,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const transactionId = document.getElementById('transaction-id').value;
         const type = document.getElementById('type').value;
-        const amount = document.getElementById('amount').value;
+        const amountInput = document.getElementById('amount'); // input 요소 자체
+        const amount = parseFloat(amountInput.value); // float으로 변환
         const category = document.getElementById('category').value;
         const description = document.getElementById('description').value;
         const date = document.getElementById('date').value;
 
-        // 클라이언트 측 유효성 검사 (추가)
-        if (parseFloat(amount) <= 0) {
-            alert('금액은 0보다 커야 합니다.');
+        // 6일차: 클라이언트 측 유효성 검사 강화
+        if (isNaN(amount) || amount <= 0) {
+            showToast('금액은 0보다 큰 유효한 숫자여야 합니다.', 'error');
+            amountInput.focus(); // 금액 입력 필드에 포커스
+            return;
+        }
+        if (!category) {
+            showToast('카테고리를 선택해주세요.', 'error');
+            return;
+        }
+        if (!date) {
+            showToast('날짜를 입력해주세요.', 'error');
             return;
         }
         if (new Date(date) > new Date()) {
-            alert('미래 날짜는 선택할 수 없습니다.');
+            showToast('미래 날짜는 선택할 수 없습니다.', 'error');
             return;
         }
+        // description은 선택 사항이므로 검사하지 않음
 
         const transactionData = {
             type,
-            amount: parseFloat(amount),
+            amount, // 이미 float으로 변환됨
             category,
             description,
             date
@@ -108,10 +119,10 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('form-title').textContent = '새로운 내역 추가하기'; // 폼 제목 변경
             document.getElementById('submit-button').textContent = '내역 추가'; // 버튼 텍스트 변경
 
-            alert(successMessage);
+            showToast(successMessage, 'success'); // 6일차: alert 대신 toast 사용
         } catch (error) {
             console.error('작업 오류:', error);
-            alert(errorMessage + error.message);
+            showToast(errorMessage + error.message, 'error'); // 6일차: alert 대신 toast 사용
         }
     });
 
@@ -132,11 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
             populateMonthSelect(); // 월 선택 드롭다운 새로고침
             displayMonthlySummary(); // 월별 요약 새로고침
             renderExpenseChart(); // 카테고리 차트 새로고침
-            renderIncomeExpenseTrendChart(); // 수입/지출 추이 차트 새로고침 (새로 추가)
+            renderIncomeExpenseTrendChart(); // 수입/지출 추이 차트 새로고침
 
         } catch (error) {
             console.error('내역 불러오기 오류:', error);
             transactionListDiv.innerHTML = '<p>내역을 불러오는 데 실패했습니다.</p>';
+            showToast('내역을 불러오는 데 실패했습니다.', 'error'); // 6일차: 토스트 알림
         }
     }
 
@@ -191,9 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
         startDateInput.value = '';
         endDateInput.value = '';
         applyFiltersAndSort(); // 필터 초기화 후 다시 적용
+        showToast('필터가 초기화되었습니다.', 'success'); // 6일차: 토스트 알림
     }
 
-    // 내역 목록을 화면에 표시하는 함수 (loadTransactions에서 분리)
+    // 내역 목록을 화면에 표시하는 함수
     function displayTransactions(transactionsToDisplay) {
         transactionListDiv.innerHTML = ''; // 기존 목록 비우기
 
@@ -225,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <hr>
                 `;
-                transactionListDiv.appendChild(transactionItem); // appendChild로 변경 (정렬된 순서 유지)
+                transactionListDiv.appendChild(transactionItem);
 
                 // 수정 버튼 이벤트 리스너
                 transactionItem.querySelector('.edit-btn').addEventListener('click', () => {
@@ -254,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('form-title').textContent = '내역 수정하기';
         document.getElementById('submit-button').textContent = '수정 완료';
 
+        showToast('내역 수정 모드로 전환되었습니다.', 'info'); // 6일차: 토스트 알림
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -278,10 +292,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             fetchAllTransactions(); // 삭제 후 모든 내역 다시 불러오기
 
-            alert('내역이 성공적으로 삭제되었습니다!');
+            showToast('내역이 성공적으로 삭제되었습니다!', 'success'); // 6일차: alert 대신 toast 사용
         } catch (error) {
             console.error('내역 삭제 오류:', error);
-            alert('내역 삭제에 실패했습니다: ' + error.message);
+            showToast('내역 삭제에 실패했습니다: ' + error.message, 'error'); // 6일차: alert 대신 toast 사용
         }
     }
 
@@ -313,9 +327,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 option.textContent = `${year}년 ${month}월`;
                 summaryMonthSelect.appendChild(option);
             });
-            summaryMonthSelect.value = sortedMonths[0]; // 가장 최신 월 자동 선택
+            // 가장 최신 월이 자동으로 선택되도록 처리
+            const latestMonth = sortedMonths[0];
+            if (latestMonth) {
+                summaryMonthSelect.value = latestMonth;
+            } else {
+                summaryMonthSelect.value = ''; // 내역이 없으면 선택 없음
+            }
         } else {
             summaryMonthSelect.innerHTML = '<option value="">내역 없음</option>';
+            summaryMonthSelect.value = '';
         }
 
         // 드롭다운 채운 후 바로 요약 정보와 차트 표시 (가장 최신 월)
@@ -350,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('월별 요약 표시 오류:', error);
             monthlySummaryDiv.innerHTML = '<p>월별 요약을 불러오는 데 실패했습니다.</p>';
+            showToast('월별 요약을 불러오는 데 실패했습니다.', 'error'); // 6일차: 토스트 알림
         }
     }
 
@@ -364,15 +386,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 expenseChartInstance = null;
             }
             const chartContainer = expenseChartCanvas.parentElement;
+            // canvas를 다시 생성하여 Chart.js 오류 방지
             chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">월을 선택하면 지출 분석 차트를 볼 수 있어요.</p>';
             return;
         }
 
         const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
 
-        // 선택된 월의 지출 내역만 필터링하고 카테고리별로 금액 집계
         const categoryExpenses = {};
-        allTransactions.forEach(t => { // allTransactions 사용
+        allTransactions.forEach(t => {
             const transactionDate = new Date(t.date);
             if (t.type === 'expense' &&
                 transactionDate.getFullYear() === selectedYear &&
@@ -431,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 5일차: 월별 수입/지출 추이 차트 그리기 (새로 추가)
+    // 월별 수입/지출 추이 차트 그리기
     async function renderIncomeExpenseTrendChart() {
         try {
             const response = await fetch('http://localhost:3000/api/monthly-trends');
@@ -451,8 +473,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 월별 데이터 정렬 및 포맷팅
-            const labels = trends.map(t => t.month); // 예: "2023-01"
+            // 월별 데이터 정렬 및 포맷팅 (YYYY-MM 형식으로 정렬되어 넘어옴)
+            const labels = trends.map(t => t.month);
             const incomes = trends.map(t => t.totalIncome);
             const expenses = trends.map(t => t.totalExpense);
 
@@ -462,25 +484,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const ctx = incomeExpenseTrendChartCanvas.getContext('2d');
             incomeExpenseTrendChartInstance = new Chart(ctx, {
-                type: 'line', // 라인 차트
+                type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
                         {
                             label: '총 수입',
                             data: incomes,
-                            borderColor: '#27ae60', // 수입: 녹색 계열
+                            borderColor: '#27ae60',
                             backgroundColor: 'rgba(39, 174, 96, 0.2)',
                             fill: true,
-                            tension: 0.3 // 곡선 부드럽게
+                            tension: 0.3
                         },
                         {
                             label: '총 지출',
                             data: expenses,
-                            borderColor: '#e74c3c', // 지출: 빨간색 계열
+                            borderColor: '#e74c3c',
                             backgroundColor: 'rgba(231, 76, 60, 0.2)',
                             fill: true,
-                            tension: 0.3 // 곡선 부드럽게
+                            tension: 0.3
                         }
                     ]
                 },
@@ -507,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 display: true,
                                 text: '금액 (원)'
                             },
-                            beginAtZero: true // Y축 0부터 시작
+                            beginAtZero: true
                         }
                     }
                 }
@@ -517,6 +539,36 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('월별 수입/지출 추이 차트 렌더링 오류:', error);
             const chartContainer = incomeExpenseTrendChartCanvas.parentElement;
             chartContainer.innerHTML = '<canvas id="incomeExpenseTrendChart"></canvas><p style="text-align: center; margin-top: 10px;">수입/지출 추이 차트를 불러오는 데 실패했습니다.</p>';
+            showToast('수입/지출 추이 차트를 불러오는 데 실패했습니다.', 'error'); // 6일차: 토스트 알림
         }
+    }
+
+    // 6일차: 토스트 알림 함수 추가
+    function showToast(message, type = 'info', duration = 3000) {
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            console.warn("Toast container not found. Alerting instead:", message);
+            alert(message); // 컨테이너가 없으면 fallback으로 alert
+            return;
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`; // 'toast success', 'toast error', 'toast info'
+        toast.textContent = message;
+
+        toastContainer.appendChild(toast);
+
+        // CSS transition을 위한 약간의 지연
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+
+        // 일정 시간 후 토스트 제거
+        setTimeout(() => {
+            toast.classList.remove('show');
+            toast.addEventListener('transitionend', () => {
+                toast.remove();
+            }, { once: true }); // transition이 끝난 후 한 번만 실행
+        }, duration);
     }
 });

@@ -169,7 +169,7 @@ button:hover {
     max-width: 500px; /* 최대 너비 설정 */
 }
 
-/* 4일차: 필터링 및 정렬 컨트롤 스타일 */
+/* 필터링 및 정렬 컨트롤 스타일 */
 .filter-sort-controls {
     background-color: #f9f9f9;
     padding: 15px;
@@ -214,6 +214,43 @@ button:hover {
 }
 
 
+/* 6일차: 토스트 알림 스타일 (새로 추가되는 부분) */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    background-color: #333;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+    transform: translateX(100%);
+    min-width: 250px;
+    text-align: center;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.success {
+    background-color: #28a745; /* Green for success */
+}
+
+.toast.error {
+    background-color: #dc3545; /* Red for error */
+}
+
 /* 반응형 디자인 */
 @media (max-width: 768px) {
     .form-group {
@@ -232,5 +269,14 @@ button:hover {
     /* 차트 컨테이너도 반응형으로 너비 조절 */
     .chart-container {
         width: 100%;
+    }
+    /* 토스트 알림도 작은 화면에서 가운데 정렬 */
+    #toast-container {
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
+        top: 10px;
+        width: 90%;
+        max-width: 300px; /* 최대 너비 제한 */
     }
 }
