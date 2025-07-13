@@ -47,16 +47,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const transactionId = document.getElementById('transaction-id').value;
         const type = document.getElementById('type').value;
-        const amountInput = document.getElementById('amount'); // input 요소 자체
-        const amount = parseFloat(amountInput.value); // float으로 변환
+        const amountInput = document.getElementById('amount');
+        const amount = parseFloat(amountInput.value);
         const category = document.getElementById('category').value;
         const description = document.getElementById('description').value;
         const date = document.getElementById('date').value;
 
-        // 6일차: 클라이언트 측 유효성 검사 강화
+        // 클라이언트 측 유효성 검사 강화
         if (isNaN(amount) || amount <= 0) {
             showToast('금액은 0보다 큰 유효한 숫자여야 합니다.', 'error');
-            amountInput.focus(); // 금액 입력 필드에 포커스
+            amountInput.focus();
             return;
         }
         if (!category) {
@@ -71,22 +71,21 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('미래 날짜는 선택할 수 없습니다.', 'error');
             return;
         }
-        // description은 선택 사항이므로 검사하지 않음
 
         const transactionData = {
             type,
-            amount, // 이미 float으로 변환됨
+            amount,
             category,
             description,
             date
         };
 
-        let url = 'http://localhost:3000/api/transactions';
+        let url = '/api/transactions'; 
         let method = 'POST';
         let successMessage = '내역이 성공적으로 추가되었습니다!';
         let errorMessage = '내역 추가에 실패했습니다: ';
 
-        if (transactionId) { // transactionId가 있으면 수정 모드
+        if (transactionId) {
             url = `${url}/${transactionId}`;
             method = 'PUT';
             successMessage = '내역이 성공적으로 수정되었습니다!';
@@ -112,17 +111,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             console.log('작업 성공:', result);
 
-            fetchAllTransactions(); // 모든 내역을 다시 불러와서 업데이트 (필터링/정렬/요약/차트 모두 반영)
-            transactionForm.reset(); // 폼 초기화
-            document.getElementById('date').valueAsDate = new Date(); // 날짜 필드 초기화
-            document.getElementById('transaction-id').value = ''; // 숨겨진 ID 필드 초기화
-            document.getElementById('form-title').textContent = '새로운 내역 추가하기'; // 폼 제목 변경
-            document.getElementById('submit-button').textContent = '내역 추가'; // 버튼 텍스트 변경
+            fetchAllTransactions();
+            transactionForm.reset();
+            document.getElementById('date').valueAsDate = new Date();
+            document.getElementById('transaction-id').value = '';
+            document.getElementById('form-title').textContent = '새로운 내역 추가하기';
+            document.getElementById('submit-button').textContent = '내역 추가';
 
-            showToast(successMessage, 'success'); // 6일차: alert 대신 toast 사용
+            showToast(successMessage, 'success');
         } catch (error) {
             console.error('작업 오류:', error);
-            showToast(errorMessage + error.message, 'error'); // 6일차: alert 대신 toast 사용
+            showToast(errorMessage + error.message, 'error');
         }
     });
 
@@ -131,30 +130,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // 모든 내역을 백엔드에서 불러와 allTransactions 배열에 저장하는 함수
     async function fetchAllTransactions() {
         try {
-            const response = await fetch('http://localhost:3000/api/transactions');
+            const response = await fetch('/api/transactions');
             if (!response.ok) {
                 throw new Error('내역을 불러오는 중 오류가 발생했습니다.');
             }
             const data = await response.json();
-            allTransactions = data.data; // 불러온 모든 내역을 저장
+            allTransactions = data.data;
 
-            // 데이터가 변경되었으므로 모든 관련 UI 업데이트
-            applyFiltersAndSort(); // 필터링 및 정렬 적용하여 목록 표시
-            populateMonthSelect(); // 월 선택 드롭다운 새로고침
-            displayMonthlySummary(); // 월별 요약 새로고침
-            renderExpenseChart(); // 카테고리 차트 새로고침
-            renderIncomeExpenseTrendChart(); // 수입/지출 추이 차트 새로고침
+            applyFiltersAndSort();
+            populateMonthSelect();
+            displayMonthlySummary();
+            renderExpenseChart();
+            renderIncomeExpenseTrendChart();
 
         } catch (error) {
             console.error('내역 불러오기 오류:', error);
             transactionListDiv.innerHTML = '<p>내역을 불러오는 데 실패했습니다.</p>';
-            showToast('내역을 불러오는 데 실패했습니다.', 'error'); // 6일차: 토스트 알림
+            showToast('내역을 불러오는 데 실패했습니다.', 'error');
         }
     }
 
     // 필터링 및 정렬을 적용하여 내역을 표시하는 함수
     function applyFiltersAndSort() {
-        let filteredTransactions = [...allTransactions]; // 원본 데이터를 복사하여 사용
+        let filteredTransactions = [...allTransactions];
 
         const filterType = filterTypeSelect.value;
         const filterCategory = filterCategorySelect.value;
@@ -162,7 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const endDate = endDateInput.value;
         const sortBy = sortBySelect.value;
 
-        // 1. 필터링 적용
         if (filterType !== 'all') {
             filteredTransactions = filteredTransactions.filter(t => t.type === filterType);
         }
@@ -178,7 +175,6 @@ document.addEventListener('DOMContentLoaded', () => {
             filteredTransactions = filteredTransactions.filter(t => t.date <= endDate);
         }
 
-        // 2. 정렬 적용
         filteredTransactions.sort((a, b) => {
             if (sortBy === 'date-desc') {
                 return new Date(b.date) - new Date(a.date);
@@ -189,10 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (sortBy === 'amount-asc') {
                 return a.amount - b.amount;
             }
-            return 0; // 기본 정렬 (변경 없음)
+            return 0;
         });
 
-        displayTransactions(filteredTransactions); // 필터링 및 정렬된 내역 표시
+        displayTransactions(filteredTransactions);
     }
 
     // 필터 초기화 함수
@@ -202,13 +198,13 @@ document.addEventListener('DOMContentLoaded', () => {
         sortBySelect.value = 'date-desc';
         startDateInput.value = '';
         endDateInput.value = '';
-        applyFiltersAndSort(); // 필터 초기화 후 다시 적용
-        showToast('필터가 초기화되었습니다.', 'success'); // 6일차: 토스트 알림
+        applyFiltersAndSort();
+        showToast('필터가 초기화되었습니다.', 'success');
     }
 
     // 내역 목록을 화면에 표시하는 함수
     function displayTransactions(transactionsToDisplay) {
-        transactionListDiv.innerHTML = ''; // 기존 목록 비우기
+        transactionListDiv.innerHTML = '';
 
         if (transactionsToDisplay && transactionsToDisplay.length > 0) {
             transactionsToDisplay.forEach(transaction => {
@@ -240,12 +236,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 transactionListDiv.appendChild(transactionItem);
 
-                // 수정 버튼 이벤트 리스너
                 transactionItem.querySelector('.edit-btn').addEventListener('click', () => {
                     editTransaction(transaction);
                 });
 
-                // 삭제 버튼 이벤트 리스너
                 transactionItem.querySelector('.delete-btn').addEventListener('click', () => {
                     deleteTransaction(transaction.id);
                 });
@@ -267,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('form-title').textContent = '내역 수정하기';
         document.getElementById('submit-button').textContent = '수정 완료';
 
-        showToast('내역 수정 모드로 전환되었습니다.', 'info'); // 6일차: 토스트 알림
+        showToast('내역 수정 모드로 전환되었습니다.', 'info');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -278,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch(`http://localhost:3000/api/transactions/${id}`, {
+            const response = await fetch(`/api/transactions/${id}`, {
                 method: 'DELETE'
             });
 
@@ -290,12 +284,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             console.log('내역 삭제 성공:', result);
 
-            fetchAllTransactions(); // 삭제 후 모든 내역 다시 불러오기
+            fetchAllTransactions();
 
-            showToast('내역이 성공적으로 삭제되었습니다!', 'success'); // 6일차: alert 대신 toast 사용
+            showToast('내역이 성공적으로 삭제되었습니다!', 'success');
         } catch (error) {
             console.error('내역 삭제 오류:', error);
-            showToast('내역 삭제에 실패했습니다: ' + error.message, 'error'); // 6일차: alert 대신 toast 사용
+            showToast('내역 삭제에 실패했습니다: ' + error.message, 'error');
         }
     }
 
@@ -327,19 +321,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 option.textContent = `${year}년 ${month}월`;
                 summaryMonthSelect.appendChild(option);
             });
-            // 가장 최신 월이 자동으로 선택되도록 처리
             const latestMonth = sortedMonths[0];
             if (latestMonth) {
                 summaryMonthSelect.value = latestMonth;
             } else {
-                summaryMonthSelect.value = ''; // 내역이 없으면 선택 없음
+                summaryMonthSelect.value = '';
             }
         } else {
             summaryMonthSelect.innerHTML = '<option value="">내역 없음</option>';
             summaryMonthSelect.value = '';
         }
 
-        // 드롭다운 채운 후 바로 요약 정보와 차트 표시 (가장 최신 월)
         displayMonthlySummary();
         renderExpenseChart();
     }
@@ -355,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const [year, month] = selectedMonth.split('-');
 
         try {
-            const response = await fetch(`http://localhost:3000/api/summary/${year}/${month}`);
+            const response = await fetch(`/api/summary/${year}/${month}`);
             if (!response.ok) {
                 throw new Error('월별 요약을 불러오는 중 오류가 발생했습니다.');
             }
@@ -371,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('월별 요약 표시 오류:', error);
             monthlySummaryDiv.innerHTML = '<p>월별 요약을 불러오는 데 실패했습니다.</p>';
-            showToast('월별 요약을 불러오는 데 실패했습니다.', 'error'); // 6일차: 토스트 알림
+            showToast('월별 요약을 불러오는 데 실패했습니다.', 'error');
         }
     }
 
@@ -386,7 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 expenseChartInstance = null;
             }
             const chartContainer = expenseChartCanvas.parentElement;
-            // canvas를 다시 생성하여 Chart.js 오류 방지
             chartContainer.innerHTML = '<canvas id="expenseChart"></canvas><p style="text-align: center; margin-top: 10px;">월을 선택하면 지출 분석 차트를 볼 수 있어요.</p>';
             return;
         }
@@ -456,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 월별 수입/지출 추이 차트 그리기
     async function renderIncomeExpenseTrendChart() {
         try {
-            const response = await fetch('http://localhost:3000/api/monthly-trends');
+            const response = await fetch('/api/monthly-trends');
             if (!response.ok) {
                 throw new Error('월별 추이 데이터를 불러오는 중 오류가 발생했습니다.');
             }
@@ -473,7 +464,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 월별 데이터 정렬 및 포맷팅 (YYYY-MM 형식으로 정렬되어 넘어옴)
             const labels = trends.map(t => t.month);
             const incomes = trends.map(t => t.totalIncome);
             const expenses = trends.map(t => t.totalExpense);
@@ -539,36 +529,34 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('월별 수입/지출 추이 차트 렌더링 오류:', error);
             const chartContainer = incomeExpenseTrendChartCanvas.parentElement;
             chartContainer.innerHTML = '<canvas id="incomeExpenseTrendChart"></canvas><p style="text-align: center; margin-top: 10px;">수입/지출 추이 차트를 불러오는 데 실패했습니다.</p>';
-            showToast('수입/지출 추이 차트를 불러오는 데 실패했습니다.', 'error'); // 6일차: 토스트 알림
+            showToast('수입/지출 추이 차트를 불러오는 데 실패했습니다.', 'error');
         }
     }
 
-    // 6일차: 토스트 알림 함수 추가
+    // 사용자에게 메시지를 표시하는 토스트 알림 함수
     function showToast(message, type = 'info', duration = 3000) {
         const toastContainer = document.getElementById('toast-container');
         if (!toastContainer) {
             console.warn("Toast container not found. Alerting instead:", message);
-            alert(message); // 컨테이너가 없으면 fallback으로 alert
+            alert(message);
             return;
         }
 
         const toast = document.createElement('div');
-        toast.className = `toast ${type}`; // 'toast success', 'toast error', 'toast info'
+        toast.className = `toast ${type}`;
         toast.textContent = message;
 
         toastContainer.appendChild(toast);
 
-        // CSS transition을 위한 약간의 지연
         setTimeout(() => {
             toast.classList.add('show');
         }, 10);
 
-        // 일정 시간 후 토스트 제거
         setTimeout(() => {
             toast.classList.remove('show');
             toast.addEventListener('transitionend', () => {
                 toast.remove();
-            }, { once: true }); // transition이 끝난 후 한 번만 실행
+            }, { once: true });
         }, duration);
     }
 });
