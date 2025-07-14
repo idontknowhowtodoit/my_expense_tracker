@@ -3,25 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Expense Tracker</title>
+    <title>나만의 스마트 가계부</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="toast-container"></div>
-
     <header>
-        <h1>💸 My Expense Tracker 💸</h1>
+        <h1>💰 나만의 스마트 가계부 💸</h1>
     </header>
 
     <main>
-        <section class="transaction-form-section">
+        <div id="loading-spinner" class="spinner-overlay">
+            <div class="spinner"></div>
+            <p>데이터 로딩 중...</p>
+        </div>
+
+        <section id="transaction-form-section" class="card">
+            <h2 id="form-title">새로운 내역 추가하기</h2>
             <form id="transaction-form">
-                <h2 id="form-title">새로운 내역 추가하기</h2>
                 <input type="hidden" id="transaction-id">
-                
+
                 <div class="form-group">
-                    <label for="type">종류:</label>
+                    <label for="type">유형:</label>
                     <select id="type" required>
                         <option value="expense">지출</option>
                         <option value="income">수입</option>
@@ -30,23 +34,36 @@
 
                 <div class="form-group">
                     <label for="amount">금액:</label>
-                    <input type="number" id="amount" placeholder="금액을 입력하세요" required>
+                    <input type="number" id="amount" placeholder="금액을 입력하세요" required min="1">
                 </div>
 
                 <div class="form-group">
                     <label for="category">카테고리:</label>
                     <select id="category" required>
-                        <option value="식비">식비</option>
-                        <option value="교통비">교통비</option>
-                        <option value="문화생활">문화생활</option>
-                        <option value="월급">월급</option>
-                        <option value="기타">기타</option>
+                        <option value="">-- 선택 --</option>
+                        <option value="식비">식비 🍔</option>
+                        <option value="교통비">교통비 🚌</option>
+                        <option value="통신비">통신비 📱</option>
+                        <option value="주거비">주거비 🏠</option>
+                        <option value="생활용품">생활용품 🛍️</option>
+                        <option value="의료비">의료비 💊</option>
+                        <option value="교육비">교육비 📚</option>
+                        <option value="문화생활">문화생활 🎬</option>
+                        <option value="경조사비">경조사비 🎁</option>
+                        <option value="의류/미용">의류/미용 💅</option>
+                        <option value="저축/투자">저축/투자 📈</option>
+                        <option value="급여">급여 💵</option>
+                        <option value="용돈">용돈 🧧</option>
+                        <option value="부수입">부수입 💰</option>
+                        <option value="상여금">상여금 🌟</option>
+                        <option value="환급">환급 🧾</option>
+                        <option value="기타">기타 💡</option>
                     </select>
                 </div>
 
                 <div class="form-group">
                     <label for="description">내용:</label>
-                    <input type="text" id="description" placeholder="무엇에 썼나요?">
+                    <input type="text" id="description" placeholder="내용을 입력하세요 (선택 사항)">
                 </div>
 
                 <div class="form-group">
@@ -54,83 +71,104 @@
                     <input type="date" id="date" required>
                 </div>
 
-                <button type="submit" id="submit-button">내역 추가</button>
+                <button type="submit" id="submit-button" class="button primary">내역 추가</button>
             </form>
         </section>
 
-        <section class="transaction-list-section">
-            <h2 id="transaction-list-title">내역 목록</h2> 
-            
-            <div class="filter-sort-controls">
-                <div class="control-group">
-                    <label for="filter-type">종류:</label>
+        <section class="filters-sort-section card">
+            <h2>내역 필터링 및 정렬</h2>
+            <div class="filter-controls">
+                <div class="filter-group">
+                    <label for="filter-type">유형:</label>
                     <select id="filter-type">
-                        <option value="all">전체</option>
-                        <option value="expense">지출</option>
+                        <option value="all">모두</option>
                         <option value="income">수입</option>
+                        <option value="expense">지출</option>
                     </select>
                 </div>
-                <div class="control-group">
+                <div class="filter-group">
                     <label for="filter-category">카테고리:</label>
                     <select id="filter-category">
-                        <option value="all">전체</option>
+                        <option value="all">모두</option>
                         <option value="식비">식비</option>
                         <option value="교통비">교통비</option>
+                        <option value="통신비">통신비</option>
+                        <option value="주거비">주거비</option>
+                        <option value="생활용품">생활용품</option>
+                        <option value="급여">급여</option>
+                        <option value="용돈">용돈</option>
+                        <option value="부수입">부수입</option>
+                        <option value="상여금">상여금</option>
+                        <option value="환급">환급</option>
+                        <option value="의료비">의료비</option>
+                        <option value="교육비">교육비</option>
                         <option value="문화생활">문화생활</option>
-                        <option value="월급">월급</option>
+                        <option value="경조사비">경조사비</option>
+                        <option value="의류/미용">의류/미용</option>
+                        <option value="저축/투자">저축/투자</option>
                         <option value="기타">기타</option>
                     </select>
                 </div>
-                <div class="control-group">
-                    <label for="sort-by">정렬:</label>
-                    <select id="sort-by">
-                        <option value="date-desc">날짜 (최신순)</option>
-                        <option value="date-asc">날짜 (오래된순)</option>
-                        <option value="amount-desc">금액 (높은순)</option>
-                        <option value="amount-asc">금액 (낮은순)</option>
-                    </select>
-                </div>
-                <div class="control-group">
+                <div class="filter-group date-filter">
                     <label for="start-date">시작일:</label>
                     <input type="date" id="start-date">
                 </div>
-                <div class="control-group">
+                <div class="filter-group date-filter">
                     <label for="end-date">종료일:</label>
                     <input type="date" id="end-date">
                 </div>
-                <button id="reset-filters-btn">필터 초기화</button>
+                <div class="filter-group">
+                    <label for="sort-by">정렬:</label>
+                    <select id="sort-by">
+                        <option value="date-desc">날짜 최신순</option>
+                        <option value="date-asc">날짜 오래된순</option>
+                        <option value="amount-desc">금액 높은순</option>
+                        <option value="amount-asc">금액 낮은순</option>
+                    </select>
+                </div>
             </div>
+            <button id="reset-filters-btn" class="button primary">필터 초기화</button>
+        </section>
 
+
+        <section id="transaction-list-section" class="card">
+            <h2>전체 내역</h2>
             <div id="transaction-list">
-                <p>아직 내역이 없어요. 새로운 내역을 추가해보세요!</p>
+                <p>로딩 중...</p>
             </div>
         </section>
 
-        <section class="summary-section">
+        <section id="summary-section" class="card">
             <h2>월별 요약</h2>
-            <div class="summary-controls">
-                <select id="summary-month-select"></select>
+            <div class="form-group">
+                <label for="summary-month-select">월 선택:</label>
+                <select id="summary-month-select">
+                    <option value="">로딩 중...</option>
+                </select>
             </div>
             <div id="monthly-summary">
                 <p>월을 선택하면 요약을 볼 수 있어요.</p>
             </div>
         </section>
 
-        <section class="chart-section">
-            <h2>월별 지출 카테고리 분석</h2>
+        <section id="charts-section" class="card">
+            <h2>재정 분석 차트</h2>
             <div class="chart-container">
+                <h3>월별 지출 카테고리</h3>
                 <canvas id="expenseChart"></canvas>
             </div>
-        </section>
-
-        <section class="chart-section">
-            <h2>월별 수입/지출 추이</h2>
             <div class="chart-container">
+                <h3>월별 수입/지출 추이</h3>
                 <canvas id="incomeExpenseTrendChart"></canvas>
             </div>
         </section>
     </main>
 
+    <footer>
+        <p>&copy; 2025 나만의 스마트 가계부. 모든 권리 보유.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
