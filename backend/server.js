@@ -16,8 +16,8 @@ mongoose.connect('mongodb://localhost:27017/expense_tracker', {
 const transactionSchema = new mongoose.Schema({
     type: { type: String, required: true, enum: ['income', 'expense'] }, // 수입 또는 지출
     amount: { type: Number, required: true, min: 0 }, // 금액 (0 이상)
-    category: { type: String, required: true }, // 카테고리
-    description: { type: String, default: '' }, // 설명
+    category: { type: String, required: true, trim: true }, // 카테고리 (trim 추가)
+    description: { type: String, default: '', trim: true }, // 설명 (trim 추가)
     date: { type: Date, required: true }, // 날짜
     createdAt: { type: Date, default: Date.now } // 생성일 (자동 기록)
 });
@@ -70,30 +70,78 @@ app.get('/api/transactions', async (req, res) => {
 // 2. 새 내역 추가
 app.post('/api/transactions', async (req, res) => {
     try {
-        const newTransaction = new Transaction(req.body);
+        const { type, amount, category, description, date } = req.body;
+
+        // 서버 측 유효성 검사 강화
+        if (!type || !['income', 'expense'].includes(type)) {
+            return res.status(400).json({ error: '유효하지 않은 유형(type)입니다. "income" 또는 "expense"여야 합니다.' });
+        }
+        if (typeof amount !== 'number' || amount <= 0) {
+            return res.status(400).json({ error: '금액은 0보다 큰 숫자여야 합니다.' });
+        }
+        if (!category || category.trim() === '') {
+            return res.status(400).json({ error: '카테고리를 입력해주세요.' });
+        }
+        if (!date || isNaN(new Date(date))) {
+            return res.status(400).json({ error: '유효하지 않은 날짜 형식입니다.' });
+        }
+        // 미래 날짜 방지
+        if (new Date(date) > new Date()) {
+            return res.status(400).json({ error: '미래 날짜는 입력할 수 없습니다.' });
+        }
+
+        const newTransaction = new Transaction({ type, amount, category, description, date });
         const savedTransaction = await newTransaction.save();
         res.status(201).json({ message: '내역이 성공적으로 추가되었습니다.', data: savedTransaction });
     } catch (error) {
+        // Mongoose validation error handling
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: error.message, details: error.errors });
+        }
         console.error('내역 추가 오류:', error);
-        res.status(400).json({ error: '내역 추가에 실패했습니다.', details: error.message });
+        res.status(500).json({ error: '내역 추가에 실패했습니다.', details: error.message });
     }
 });
 
 // 3. 내역 수정
 app.put('/api/transactions/:id', async (req, res) => {
     try {
+        const { type, amount, category, description, date } = req.body;
+
+        // 서버 측 유효성 검사 강화 (추가 API와 동일)
+        if (!type || !['income', 'expense'].includes(type)) {
+            return res.status(400).json({ error: '유효하지 않은 유형(type)입니다. "income" 또는 "expense"여야 합니다.' });
+        }
+        if (typeof amount !== 'number' || amount <= 0) {
+            return res.status(400).json({ error: '금액은 0보다 큰 숫자여야 합니다.' });
+        }
+        if (!category || category.trim() === '') {
+            return res.status(400).json({ error: '카테고리를 입력해주세요.' });
+        }
+        if (!date || isNaN(new Date(date))) {
+            return res.status(400).json({ error: '유효하지 않은 날짜 형식입니다.' });
+        }
+        // 미래 날짜 방지
+        if (new Date(date) > new Date()) {
+            return res.status(400).json({ error: '미래 날짜는 입력할 수 없습니다.' });
+        }
+
         const updatedTransaction = await Transaction.findByIdAndUpdate(
             req.params.id,
-            req.body,
-            { new: true, runValidators: true }
+            { type, amount, category, description, date }, // req.body 대신 개별 필드 사용
+            { new: true, runValidators: true } // runValidators: true 추가
         );
         if (!updatedTransaction) {
             return res.status(404).json({ error: '해당 내역을 찾을 수 없습니다.' });
         }
         res.status(200).json({ message: '내역이 성공적으로 수정되었습니다.', data: updatedTransaction });
     } catch (error) {
+        // Mongoose validation error handling
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: error.message, details: error.errors });
+        }
         console.error('내역 수정 오류:', error);
-        res.status(400).json({ error: '내역 수정에 실패했습니다.', details: error.message });
+        res.status(500).json({ error: '내역 수정에 실패했습니다.', details: error.message });
     }
 });
 
@@ -210,13 +258,15 @@ app.get('/api/transactions/export-csv', async (req, res) => {
         const transactions = await Transaction.find(query).sort({ date: -1, createdAt: -1 });
 
         // CSV 헤더 생성
+        // 내용에 콤마(,)나 따옴표(")가 포함될 경우 CSV 규칙에 따라 처리
         const headers = '날짜,유형,카테고리,금액,내용\n';
 
         // CSV 본문 생성
         const csvRows = transactions.map(t => {
             const date = t.date.toISOString().split('T')[0]; // YYYY-MM-DD 형식
             const type = t.type === 'income' ? '수입' : '지출';
-            const description = t.description ? `"${t.description.replace(/"/g, '""')}"` : ''; // 내용에 콤마나 따옴표가 있을 경우 처리
+            // 내용을 CSV 형식에 맞게 처리: 따옴표 안에 따옴표는 두 개로, 전체를 따옴표로 묶음
+            const description = t.description ? `"${t.description.replace(/"/g, '""')}"` : ''; 
             return `${date},${type},${t.category},${t.amount},${description}`;
         });
 
@@ -224,7 +274,9 @@ app.get('/api/transactions/export-csv', async (req, res) => {
 
         // CSV 파일 응답 설정
         res.setHeader('Content-Type', 'text/csv; charset=utf-8'); // UTF-8 인코딩 명시
-        res.setHeader('Content-Disposition', `attachment; filename="가계부_내역${year && month ? `_${year}년${month}월` : '_전체'}.csv"`);
+        // 한글 파일명 처리를 위해 encodeURIComponent 적용
+        const filename = `가계부_내역${year && month ? `_${year}년${month}월` : '_전체'}.csv`;
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
         res.send(csvString);
 
     } catch (error) {
